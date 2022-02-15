@@ -24,7 +24,6 @@ void MQTTTraceCallback (int level, char * message){
 int main(int argc, char *argv[]){
 
     int rc = 0;
-    int cycle = 0;
     struct memory mem;
     
     openlog("ibm_cloud_device", LOG_PID, LOG_USER);
@@ -33,7 +32,7 @@ int main(int argc, char *argv[]){
     IoTPDevice *device = NULL;
     
     if(argc != 5){
-        syslog(LOG_ERR, "Wrong argument countd\n");
+        syslog(LOG_ERR, "Wrong argument count\n");
     }
 
     /* Set signal handlers */
@@ -50,7 +49,7 @@ int main(int argc, char *argv[]){
     /* Create IoTPConfig object using configuration options defined in the configuration file. */
     rc = IoTPConfig_create(&config, NULL);
     if ( rc != 0 ) {
-        syslog(LOG_ERR, "ERROR: Failed to initialize configuration: rc=%d\n", rc);
+        syslog(LOG_ERR, "Failed to initialize configuration: rc=%d\n", rc);
         exit(1);
     }
     
@@ -62,7 +61,7 @@ int main(int argc, char *argv[]){
     /* Create IoTPDevice object */
     rc = IoTPDevice_create(&device, config);
     if ( rc != 0 ) {
-        syslog(LOG_ERR, "ERROR: Failed to configure IoTP device: rc=%d\n", rc);
+        syslog(LOG_ERR, "Failed to configure IoTP device: rc=%d\n", rc);
         exit(1);
     }
 
@@ -75,8 +74,8 @@ int main(int argc, char *argv[]){
     /* Invoke connection API IoTPDevice_connect() to connect to WIoTP. */
     rc = IoTPDevice_connect(device);
     if ( rc != 0 ) {
-        syslog(LOG_ERR, "ERROR: Failed to connect to Watson IoT Platform: rc=%d\n", rc);
-        syslog(LOG_ERR, "ERROR: Returned error reason: %s\n", IOTPRC_toString(rc));
+        syslog(LOG_ERR, "Failed to connect to Watson IoT Platform: rc=%d\n", rc);
+        syslog(LOG_ERR, "Returned error reason: %s\n", IOTPRC_toString(rc));
         exit(1);
     }
 
@@ -84,11 +83,12 @@ int main(int argc, char *argv[]){
     {
     	get_usage(&mem);
     	char data[1024]; 
-    	sprintf(data, "{\"totalMemory\": \"%ld\", \"freeMemory\":\"%ld\", \"sharedMemory\":\"%ld\", \"bufferedMemory\":\"%ld\"}", mem.totalMemory, mem.freeMemory, mem.sharedMemory, mem.bufferedMemory);
+    	sprintf(data, "{\"totalMemory\": \"%ld\", \"freeMemory\":\"%ld\", \"sharedMemory\":\"%ld\",\"bufferedMemory\":\"%ld\"}",
+    			mem.totalMemory, mem.freeMemory, mem.sharedMemory, mem.bufferedMemory);
         rc = IoTPDevice_sendEvent(device,"status", &data, "json", QoS0, NULL);
         
         if ( rc != 0 ) {
-            syslog(LOG_ERR, "ERROR: Failed to send event: rc=%d\n", rc);
+            syslog(LOG_ERR, "Failed to send event: rc=%d\n", rc);
         }
         else {
             syslog(LOG_INFO, "Successfully published data to IBM cloud");
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]){
 
     rc = IoTPDevice_disconnect(device);
     if ( rc != IOTPRC_SUCCESS ) {
-        syslog(LOG_ERR, "ERROR: Failed to disconnect from  Watson IoT Platform: rc=%d\n", rc);
+        syslog(LOG_ERR, "Failed to disconnect from  Watson IoT Platform: rc=%d\n", rc);
         exit(1);
     }
 

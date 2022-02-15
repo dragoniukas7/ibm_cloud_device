@@ -1,0 +1,13 @@
+Index: lib_ibm_cloud-1.0.0/Makefile
+===================================================================
+--- lib_ibm_cloud-1.0.0.orig/Makefile
++++ lib_ibm_cloud-1.0.0/Makefile
+@@ -323,7 +323,7 @@ paho-mqtt-download:
+ 
+ paho-mqtt-build:
+ 	echo "Build paho mqtt c"
+-	make -C paho.mqtt.c
++	make GAI_LIB= -C  paho.mqtt.c
+ 
+ tests:
+ 	make -C test

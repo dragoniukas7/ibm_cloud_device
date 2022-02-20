@@ -24,75 +24,15 @@ void MQTTTraceCallback(int level, char *message)
 
 void set_config(IoTPConfig *config, char *orgId, char *typeId, char *deviceId, char *token)
 {
-
-    IoTPConfig_setProperty(config, "identity.orgId", argv[1]);
-    IoTPConfig_setProperty(config, "identity.typeId", argv[2]);
-    IoTPConfig_setProperty(config, "identity.deviceId", argv[3]);
-    IoTPConfig_setProperty(config, "auth.token", argv[4]);
+    IoTPConfig_setProperty(config, "identity.orgId", orgId);
+    IoTPConfig_setProperty(config, "identity.typeId", typeId);
+    IoTPConfig_setProperty(config, "identity.deviceId", deviceId);
+    IoTPConfig_setProperty(config, "auth.token", token);
 }
 
-/* Main program */
-int main(int argc, char *argv[])
+void send_data(IoTPDevice *device)
 {
-
-    int rc = 0;
-    struct memory mem;
-
-    openlog("ibm_cloud_device", LOG_PID, LOG_USER);
-
-    IoTPConfig *config = NULL;
-    IoTPDevice *device = NULL;
-
-    if (argc != 5)
-    {
-        syslog(LOG_ERR, "Wrong argument count\n");
-    }
-
-    /* Set signal handlers */
-    signal(SIGINT, sigHandler);
-    signal(SIGTERM, sigHandler);
-
-    /* Set IoTP Client log handler */
-    rc = IoTPConfig_setLogHandler(IoTPLog_FileDescriptor, stdout);
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "Failed to set IoTP Client log handler: rc=%d\n", rc);
-        goto end;
-    }
-
-    /* Create IoTPConfig object using configuration options defined in the configuration file. */
-    rc = IoTPConfig_create(&config, NULL);
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "Failed to initialize configuration: rc=%d\n", rc);
-        goto end;
-    }
-
-    set_config(config, argv[1], argv[2], argv[3], argv[4]);
-
-    /* Create IoTPDevice object */
-    rc = IoTPDevice_create(&device, config);
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "Failed to configure IoTP device: rc=%d\n", rc);
-        goto end;
-    }
-
-    /* Set MQTT Trace handler */
-    rc = IoTPDevice_setMQTTLogHandler(device, &MQTTTraceCallback);
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "WARN: Failed to set MQTT Trace handler: rc=%d\n", rc);
-    }
-
-    /* Invoke connection API IoTPDevice_connect() to connect to WIoTP. */
-    rc = IoTPDevice_connect(device);
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "Failed to connect to Watson IoT Platform: rc=%d\n", rc);
-        syslog(LOG_ERR, "Returned error reason: %s\n", IOTPRC_toString(rc));
-        goto end;
-    }
+    struct memory mem = NULL;
 
     while (!interrupt)
     {
@@ -104,7 +44,7 @@ int main(int argc, char *argv[])
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Failed to send event: rc=%d\n", rc);
+            syslog(LOG_ERR, "Failed to send event");
         }
         else
         {
@@ -112,13 +52,77 @@ int main(int argc, char *argv[])
         }
         sleep(10);
     }
+}
 
-    syslog(LOG_INFO, "Publish event cycle is complete.\n");
+int main(int argc, char *argv[])
+{
+    int rc = 0;
+
+    openlog("ibm_cloud_device", LOG_PID, LOG_USER);
+
+    IoTPConfig *config = NULL;
+    IoTPDevice *device = NULL;
+
+    if (argc != 5)
+    {
+        syslog(LOG_ERR, "Wrong argument count");
+        goto end;
+    }
+
+    /* Set signal handlers */
+    signal(SIGINT, sigHandler);
+    signal(SIGTERM, sigHandler);
+
+    /* Set IoTP Client log handler */
+    rc = IoTPConfig_setLogHandler(IoTPLog_FileDescriptor, stdout);
+    if (rc != 0)
+    {
+        syslog(LOG_ERR, "Failed to set IoTP Client log handler");
+        goto end;
+    }
+
+    /* Create IoTPConfig object using configuration options defined in the configuration file. */
+    rc = IoTPConfig_create(&config, NULL);
+    if (rc != 0)
+    {
+        syslog(LOG_ERR, "Failed to initialize configuration");
+        goto end;
+    }
+
+    set_config(config, argv[1], argv[2], argv[3], argv[4]);
+
+    /* Create IoTPDevice object */
+    rc = IoTPDevice_create(&device, config);
+    if (rc != 0)
+    {
+        syslog(LOG_ERR, "Failed to configure IoTP device");
+        goto end;
+    }
+
+    /* Set MQTT Trace handler */
+    rc = IoTPDevice_setMQTTLogHandler(device, &MQTTTraceCallback);
+    if (rc != 0)
+    {
+        syslog(LOG_ERR, "WARN: Failed to set MQTT Trace handler");
+    }
+
+    /* Invoke connection API IoTPDevice_connect() to connect to WIoTP. */
+    rc = IoTPDevice_connect(device);
+    if (rc != 0)
+    {
+        syslog(LOG_ERR, "Failed to connect to Watson IoT Platform");
+        syslog(LOG_ERR, "Returned error reason: %s\n", IOTPRC_toString(rc));
+        goto end;
+    }
+
+    send_data(device);
+
+    syslog(LOG_INFO, "Publish event cycle is complete");
 
     rc = IoTPDevice_disconnect(device);
     if (rc != IOTPRC_SUCCESS)
     {
-        syslog(LOG_ERR, "Failed to disconnect from  Watson IoT Platform: rc=%d\n", rc);
+        syslog(LOG_ERR, "Failed to disconnect from  Watson IoT Platform");
         goto end;
     }
 

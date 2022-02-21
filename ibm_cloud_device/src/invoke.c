@@ -29,7 +29,7 @@ static const struct blobmsg_policy memory_policy[__MEMORY_MAX] = {
 	[BUFFERED_MEMORY] = { .name = "buffered", .type = BLOBMSG_TYPE_INT64 },
 };
 
-static void board_cb(struct ubus_request *req, int type, struct blob_attr *msg) {
+static void mem_cb(struct ubus_request *req, int type, struct blob_attr *msg) {
 	struct memory *mem = (struct memory *)req->priv;
 	struct blob_attr *tb[__INFO_MAX];
 	struct blob_attr *memory[__MEMORY_MAX];
@@ -63,8 +63,8 @@ int get_usage(struct memory *mem)
 	}
 
 	if (ubus_lookup_id(ctx, "system", &id) ||
-	        ubus_invoke(ctx, id, "info", NULL, board_cb, mem, 3000)) {
-		syslog(LOG_ERR, "cannot request memory info from procd\n");
+	        ubus_invoke(ctx, id, "info", NULL, mem_cb, mem, 3000)) {
+		syslog(LOG_ERR, "Cannot request memory info from procd\n");
 		rc=-1;
 	}
 

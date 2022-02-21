@@ -1,13 +1,67 @@
 #include <stdio.h>
+#include <argp.h>
 #include <signal.h>
 #include <memory.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <iotp_device.h>
 #include <syslog.h>
+#include <sys/file.h>
 #include "invoke.h"
 
+#define PIDFILE "/var/lock/ibm_cloud_device.lock"
+
+ #define   LOCK_SH   1    /* shared lock */
+ #define   LOCK_EX   2    /* exclusive lock */
+ #define   LOCK_NB   4    /* don't block when locking */
+ #define   LOCK_UN   8    /* unlock */
+
 volatile int interrupt = 0;
+
+static struct argp_option options[] = {
+    {"organization", 'o', "ORGANIZATION", 0, "Organization ID"},
+    {"type", 't', "TYPE", 0, "Type ID"},
+    {"device", 'd', "DEVICE", 0, "Device ID"},
+    {"token", 'a', "TOKEN", 0, "Authentication token"},
+    {0}};
+
+static char doc[] = "IBM cloud device daemon program";
+
+/* A description of the arguments we accept. */
+static char args_doc[] = "";
+
+struct arguments
+{
+    char *organization, *type, *device, *token;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct arguments *arguments = state->input;
+
+    switch (key)
+    {
+    case 'o':
+        arguments->organization = arg;
+        break;
+    case 't':
+        arguments->type = arg;
+        break;
+    case 'd':
+        arguments->device = arg;
+        break;
+    case 'a':
+        arguments->token = arg;
+        break;
+    case ARGP_KEY_ARG:
+        if (state->arg_num > 0)
+            argp_usage(state);
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
 
 void sigHandler(int signo)
 {
@@ -32,7 +86,8 @@ void set_config(IoTPConfig *config, char *orgId, char *typeId, char *deviceId, c
 
 void send_data(IoTPDevice *device)
 {
-    struct memory mem = NULL;
+    struct memory mem;
+    int rc = 0;
 
     while (!interrupt)
     {
@@ -54,20 +109,59 @@ void send_data(IoTPDevice *device)
     }
 }
 
+void initiate_arguments(struct arguments *arguments)
+{
+    arguments->organization = "";
+    arguments->type = "";
+    arguments->device = "";
+    arguments->token = "";
+}
+
+void aquire_lock(int *fd, int *lock)
+{
+}
+
+void relase_lock(int *fd, int *lock)
+{
+    if (flock(fd, LOCK_UN) == -1)
+    {
+        exit(1);
+    }
+    close(fd);
+}
+
+static struct argp argp = {options, parse_opt, args_doc, doc};
+
 int main(int argc, char *argv[])
 {
-    int rc = 0;
-
     openlog("ibm_cloud_device", LOG_PID, LOG_USER);
+
+    int fd, lock;
+
+    if (fd = open(PIDFILE, (O_RDWR | O_CREAT)) == -1)
+    {
+        syslog(LOG_ERR, "Cannot open PID file");
+        exit(1);
+    }
+
+    syslog(LOG_ERR, "fd: %d", fd);
+
+    if (flock(fd, LOCK_EX) == -1)
+    {
+        syslog(LOG_ERR, "File is locked, exiting");
+        exit(1);
+    }
+    // aquire_lock(&fd, &lock);
+
+    struct arguments arguments;
+    int rc = 0;
 
     IoTPConfig *config = NULL;
     IoTPDevice *device = NULL;
 
-    if (argc != 5)
-    {
-        syslog(LOG_ERR, "Wrong argument count");
-        goto end;
-    }
+    initiate_arguments(&arguments);
+
+    argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
     /* Set signal handlers */
     signal(SIGINT, sigHandler);
@@ -89,7 +183,7 @@ int main(int argc, char *argv[])
         goto end;
     }
 
-    set_config(config, argv[1], argv[2], argv[3], argv[4]);
+    set_config(config, arguments.organization, arguments.type, arguments.device, arguments.token);
 
     /* Create IoTPDevice object */
     rc = IoTPDevice_create(&device, config);
@@ -104,6 +198,7 @@ int main(int argc, char *argv[])
     if (rc != 0)
     {
         syslog(LOG_ERR, "WARN: Failed to set MQTT Trace handler");
+        goto end;
     }
 
     /* Invoke connection API IoTPDevice_connect() to connect to WIoTP. */
@@ -130,6 +225,7 @@ end:
     IoTPDevice_destroy(device);
     IoTPConfig_clear(config);
     closelog();
+    relase_lock(fd, lock);
 
     return 0;
 }

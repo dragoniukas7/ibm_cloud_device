@@ -11,11 +11,6 @@
 
 #define PIDFILE "/var/lock/ibm_cloud_device.lock"
 
- #define   LOCK_SH   1    /* shared lock */
- #define   LOCK_EX   2    /* exclusive lock */
- #define   LOCK_NB   4    /* don't block when locking */
- #define   LOCK_UN   8    /* unlock */
-
 volatile int interrupt = 0;
 
 static struct argp_option options[] = {
@@ -108,6 +103,10 @@ void send_data(IoTPDevice *device)
         sleep(10);
     }
 }
+ #define   LOCK_SH   1    /* shared lock */
+ #define   LOCK_EX   2    /* exclusive lock */
+ #define   LOCK_NB   4    /* don't block when locking */
+ #define   LOCK_UN   8    /* unlock */
 
 void initiate_arguments(struct arguments *arguments)
 {
@@ -119,15 +118,27 @@ void initiate_arguments(struct arguments *arguments)
 
 void aquire_lock(int *fd, int *lock)
 {
+    if ((fd = open(PIDFILE, (O_RDWR | O_CREAT))) == -1)
+    {
+        syslog(LOG_ERR, "Cannot open PID file in %s", PIDFILE);
+        exit(1);
+    }
+
+    if (flock(fd, LOCK_EX | LOCK_NB) == -1)
+    {
+        syslog(LOG_ERR, "File %s is locked, exiting", PIDFILE);
+        exit(1);
+    }
 }
 
 void relase_lock(int *fd, int *lock)
 {
-    if (flock(fd, LOCK_UN) == -1)
+    syslog(LOG_INFO, "Relasing lock");
+    if (flock(*fd, LOCK_UN) == -1)
     {
         exit(1);
     }
-    close(fd);
+    close(*fd);
 }
 
 static struct argp argp = {options, parse_opt, args_doc, doc};
@@ -138,20 +149,7 @@ int main(int argc, char *argv[])
 
     int fd, lock;
 
-    if (fd = open(PIDFILE, (O_RDWR | O_CREAT)) == -1)
-    {
-        syslog(LOG_ERR, "Cannot open PID file");
-        exit(1);
-    }
-
-    syslog(LOG_ERR, "fd: %d", fd);
-
-    if (flock(fd, LOCK_EX) == -1)
-    {
-        syslog(LOG_ERR, "File is locked, exiting");
-        exit(1);
-    }
-    // aquire_lock(&fd, &lock);
+    aquire_lock(&fd, &lock);
 
     struct arguments arguments;
     int rc = 0;
@@ -225,7 +223,7 @@ end:
     IoTPDevice_destroy(device);
     IoTPConfig_clear(config);
     closelog();
-    relase_lock(fd, lock);
+    relase_lock(&fd, &lock);
 
     return 0;
 }

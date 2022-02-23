@@ -1,10 +1,10 @@
 #include <stdio.h>
+#include <iotp_device.h>
 #include <argp.h>
 #include <signal.h>
 #include <memory.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <iotp_device.h>
 #include <syslog.h>
 #include <sys/file.h>
 #include "invoke.h"
@@ -103,10 +103,6 @@ void send_data(IoTPDevice *device)
         sleep(10);
     }
 }
- #define   LOCK_SH   1    /* shared lock */
- #define   LOCK_EX   2    /* exclusive lock */
- #define   LOCK_NB   4    /* don't block when locking */
- #define   LOCK_UN   8    /* unlock */
 
 void initiate_arguments(struct arguments *arguments)
 {
@@ -118,13 +114,13 @@ void initiate_arguments(struct arguments *arguments)
 
 void aquire_lock(int *fd, int *lock)
 {
-    if ((fd = open(PIDFILE, (O_RDWR | O_CREAT))) == -1)
+    if ((*fd = open(PIDFILE, (O_RDWR | O_CREAT))) == -1)
     {
         syslog(LOG_ERR, "Cannot open PID file in %s", PIDFILE);
         exit(1);
     }
 
-    if (flock(fd, LOCK_EX | LOCK_NB) == -1)
+    if (flock(*fd, LOCK_EX | LOCK_NB) == -1)
     {
         syslog(LOG_ERR, "File %s is locked, exiting", PIDFILE);
         exit(1);
@@ -195,7 +191,7 @@ int main(int argc, char *argv[])
     rc = IoTPDevice_setMQTTLogHandler(device, &MQTTTraceCallback);
     if (rc != 0)
     {
-        syslog(LOG_ERR, "WARN: Failed to set MQTT Trace handler");
+        syslog(LOG_ALERT, "WARN: Failed to set MQTT Trace handler");
         goto end;
     }
 

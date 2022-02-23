@@ -22,7 +22,6 @@ static struct argp_option options[] = {
 
 static char doc[] = "IBM cloud device daemon program";
 
-/* A description of the arguments we accept. */
 static char args_doc[] = "";
 
 struct arguments

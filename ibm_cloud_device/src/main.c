@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <iotp_device.h>
-#include <argp.h>
 #include <signal.h>
 #include <memory.h>
 #include <stdlib.h>
@@ -8,107 +7,18 @@
 #include <syslog.h>
 #include <sys/file.h>
 #include "invoke.h"
+#include "arg_parse.h"
+#include "watson.h"
 
 #define PIDFILE "/var/lock/ibm_cloud_device.lock"
 
 volatile int interrupt = 0;
-
-static struct argp_option options[] = {
-    {"organization", 'o', "ORGANIZATION", 0, "Organization ID"},
-    {"type", 't', "TYPE", 0, "Type ID"},
-    {"device", 'd', "DEVICE", 0, "Device ID"},
-    {"token", 'a', "TOKEN", 0, "Authentication token"},
-    {0}};
-
-static char doc[] = "IBM cloud device daemon program";
-
-static char args_doc[] = "";
-
-struct arguments
-{
-    char *organization, *type, *device, *token;
-};
-
-static error_t parse_opt(int key, char *arg, struct argp_state *state)
-{
-    struct arguments *arguments = state->input;
-
-    switch (key)
-    {
-    case 'o':
-        arguments->organization = arg;
-        break;
-    case 't':
-        arguments->type = arg;
-        break;
-    case 'd':
-        arguments->device = arg;
-        break;
-    case 'a':
-        arguments->token = arg;
-        break;
-    case ARGP_KEY_ARG:
-        if (state->arg_num > 0)
-            argp_usage(state);
-        break;
-    default:
-        return ARGP_ERR_UNKNOWN;
-    }
-    return 0;
-}
 
 void sigHandler(int signo)
 {
     signal(SIGINT, NULL);
     syslog(LOG_INFO, "Received signal: %d\n", signo);
     interrupt = 1;
-}
-
-void MQTTTraceCallback(int level, char *message)
-{
-    if (level > 0)
-        syslog(LOG_DEBUG, "%s\n", message ? message : "NULL");
-}
-
-void set_config(IoTPConfig *config, char *orgId, char *typeId, char *deviceId, char *token)
-{
-    IoTPConfig_setProperty(config, "identity.orgId", orgId);
-    IoTPConfig_setProperty(config, "identity.typeId", typeId);
-    IoTPConfig_setProperty(config, "identity.deviceId", deviceId);
-    IoTPConfig_setProperty(config, "auth.token", token);
-}
-
-void send_data(IoTPDevice *device)
-{
-    struct memory mem;
-    int rc = 0;
-
-    while (!interrupt)
-    {
-        get_usage(&mem);
-        char data[1024];
-        sprintf(data, "{\"totalMemory\": \"%ld\", \"freeMemory\":\"%ld\", \"sharedMemory\":\"%ld\",\"bufferedMemory\":\"%ld\"}",
-                mem.totalMemory, mem.freeMemory, mem.sharedMemory, mem.bufferedMemory);
-        rc = IoTPDevice_sendEvent(device, "status", &data, "json", QoS0, NULL);
-
-        if (rc != 0)
-        {
-            syslog(LOG_ERR, "Failed to send event");
-        }
-        else
-        {
-            syslog(LOG_INFO, "Successfully published data to IBM cloud");
-        }
-        sleep(10);
-    }
-}
-
-void initiate_arguments(struct arguments *arguments)
-{
-    arguments->organization = "";
-    arguments->type = "";
-    arguments->device = "";
-    arguments->token = "";
 }
 
 void aquire_lock(int *fd, int *lock)
